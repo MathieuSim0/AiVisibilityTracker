@@ -38,12 +38,10 @@ function SignInForm() {
   };
 
   const handleGoogle = () => signIn("google", { callbackUrl });
-  const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "true";
 
   return (
     <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-8 shadow-xl shadow-black/5 dark:shadow-black/20">
-      {googleEnabled && (
-        <button
+      <button
           onClick={handleGoogle}
           className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-white text-gray-900 font-semibold text-sm hover:bg-gray-100 transition-all shadow-md border border-gray-200 dark:border-transparent mb-6"
         >
@@ -55,10 +53,8 @@ function SignInForm() {
           </svg>
           {t("continue_google")}
         </button>
-      )}
 
-      {googleEnabled && (
-        <div className="relative mb-6">
+      <div className="relative mb-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-200 dark:border-white/10" />
           </div>
@@ -66,7 +62,6 @@ function SignInForm() {
             <span className="bg-white dark:bg-[#111827] px-3 rounded">{t("or_email")}</span>
           </div>
         </div>
-      )}
 
       {error && (
         <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-sm">
