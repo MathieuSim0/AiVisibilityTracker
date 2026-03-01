@@ -30,7 +30,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const password = credentials?.password as string;
         if (!email || !password) return null;
 
-        const user = getUserByEmail(email);
+        const user = await getUserByEmail(email);
         if (!user || !user.password_hash) return null;
 
         const valid = await bcrypt.compare(password, user.password_hash);
@@ -41,7 +41,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           email: user.email,
           name: user.name ?? email.split("@")[0],
           image: user.avatar_url ?? null,
-          twoFaEnabled: user.two_fa_enabled === 1,
+          twoFaEnabled: user.two_fa_enabled,
         };
       },
     }),
@@ -54,15 +54,15 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
     async signIn({ user, account, profile }) {
       if (account?.provider === "google") {
         const googleId = profile?.sub as string;
-        const existing = getUserByGoogleId(googleId);
+        const existing = await getUserByGoogleId(googleId);
 
         if (!existing) {
-          const byEmail = getUserByEmail(user.email!);
+          const byEmail = await getUserByEmail(user.email!);
           if (byEmail) {
-            linkGoogleAccount(byEmail.id, googleId, user.image ?? null);
+            await linkGoogleAccount(byEmail.id, googleId, user.image ?? null);
             user.id = byEmail.id;
           } else {
-            const created = createUser({
+            const created = await createUser({
               email: user.email!,
               name: user.name ?? null,
               google_id: googleId,
@@ -78,13 +78,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
     },
 
     // Override session to also refresh name/image from DB
-    session({ session, token }) {
+    async session({ session, token }) {
       session.user.id = token.userId as string;
       session.user.twoFaEnabled = (token.twoFaEnabled as boolean) ?? false;
       session.user.twoFaVerified = (token.twoFaVerified as boolean) ?? true;
 
       if (token.userId) {
-        const dbUser = getUserById(token.userId as string);
+        const dbUser = await getUserById(token.userId as string);
         if (dbUser) {
           session.user.name = dbUser.name ?? session.user.name;
           session.user.image = dbUser.avatar_url ?? session.user.image;

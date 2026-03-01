@@ -14,13 +14,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
 
-    const existing = getUserByEmail(email);
+    const existing = await getUserByEmail(email);
     if (existing) {
       return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
     }
 
     const password_hash = await bcrypt.hash(password, 12);
-    const user = createUser({
+    const user = await createUser({
       email,
       name: name?.trim() || email.split("@")[0],
       password_hash,

@@ -90,7 +90,7 @@ export default async function DashboardPage() {
     redirect("/auth/2fa");
   }
 
-  const scans = getScansByUser(session.user.id);
+  const scans = await getScansByUser(session.user.id);
 
   const totalScans = scans.length;
   const uniqueDomains = new Set(scans.map((s) => s.domain)).size;

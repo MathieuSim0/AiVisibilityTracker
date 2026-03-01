@@ -9,7 +9,7 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const { secret, otpAuthUrl } = generate2FASecret(session.user.id);
+  const { secret, otpAuthUrl } = await generate2FASecret(session.user.id);
   const qrDataUrl = await QRCode.toDataURL(otpAuthUrl);
 
   return NextResponse.json({ secret, qrDataUrl });

@@ -30,26 +30,23 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Attach scan to authenticated user if available
   const session = await auth();
   const userId = session?.user?.id ?? undefined;
 
-  const scan = createScan(domain, userId);
-  updateScan(scan.id, { status: "running" });
+  const scan = await createScan(domain, userId);
+  await updateScan(scan.id, { status: "running" });
 
-  // Demo mode: use pre-populated data for demo domains
   const demoData = isDemoDomain(domain) ? getDemoData(domain) : null;
 
   const stream = new ReadableStream({
     async start(controller) {
       try {
         if (demoData) {
-          // Simulate streaming with demo data (with small delays for realism)
           const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
           sendEvent(controller, "step", { step: "sector", message: "Detecting industry sector..." });
           await delay(800);
-          updateScan(scan.id, { sector: demoData.sector.sector });
+          await updateScan(scan.id, { sector: demoData.sector.sector });
           sendEvent(controller, "sector", demoData.sector);
 
           await delay(600);
@@ -65,13 +62,13 @@ export async function POST(req: NextRequest) {
             await delay(300);
             sendEvent(controller, "llm_progress", { llm: result.llm_name, query: result.query, index: i + 1, total });
             await delay(400);
-            insertQueryResult(scan.id, result);
+            await insertQueryResult(scan.id, result);
             sendEvent(controller, "result", result);
           }
 
           await delay(500);
           sendEvent(controller, "step", { step: "competitors", message: "Analyzing competitors..." });
-          insertCompetitors(scan.id, demoData.competitors);
+          await insertCompetitors(scan.id, demoData.competitors);
           sendEvent(controller, "competitors", { competitors: demoData.competitors });
 
           await delay(400);
@@ -79,12 +76,11 @@ export async function POST(req: NextRequest) {
 
           await delay(600);
           sendEvent(controller, "step", { step: "recommendations", message: "Generating recommendations..." });
-          insertRecommendations(scan.id, demoData.recommendations);
+          await insertRecommendations(scan.id, demoData.recommendations);
           sendEvent(controller, "recommendations", { recommendations: demoData.recommendations });
 
-          // Calculate score from demo results
           const scores = calculateScores(demoData.results as LLMQueryResponse[]);
-          updateScan(scan.id, {
+          await updateScan(scan.id, {
             status: "done",
             overall_score: scores.overall_score,
             mention_rate: scores.mention_rate,
@@ -101,7 +97,7 @@ export async function POST(req: NextRequest) {
         // Step 1: Detect sector
         sendEvent(controller, "step", { step: "sector", message: "Detecting industry sector..." });
         const sectorInfo = await detectSector(domain);
-        updateScan(scan.id, { sector: sectorInfo.sector });
+        await updateScan(scan.id, { sector: sectorInfo.sector });
         sendEvent(controller, "sector", { sector: sectorInfo.sector, description: sectorInfo.description });
 
         // Step 2: Generate queries
@@ -130,7 +126,6 @@ export async function POST(req: NextRequest) {
               total: totalCalls,
             });
 
-            // Retry logic for rate limits (Groq TPM limit)
             let retries = 3;
             while (retries > 0) {
               try {
@@ -140,13 +135,12 @@ export async function POST(req: NextRequest) {
                   sector: sectorInfo.sector,
                 });
                 allResults.push(result);
-                insertQueryResult(scan.id, result);
+                await insertQueryResult(scan.id, result);
                 sendEvent(controller, "result", result);
                 break;
               } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
                 if (msg.includes("429") || msg.includes("rate limit") || msg.includes("Rate limit")) {
-                  // Extract retry delay from error message or use default
                   const waitMatch = msg.match(/try again in (\d+)ms/i) || msg.match(/(\d+)ms/);
                   const waitMs = waitMatch ? parseInt(waitMatch[1]) + 200 : 2000;
                   console.log(`Rate limited on ${llmName}, waiting ${waitMs}ms...`);
@@ -159,7 +153,6 @@ export async function POST(req: NextRequest) {
               }
             }
 
-            // Small delay between calls to stay within TPM limits
             await new Promise((r) => setTimeout(r, 600));
           }
         }
@@ -167,7 +160,7 @@ export async function POST(req: NextRequest) {
         // Step 4: Analyze competitors
         sendEvent(controller, "step", { step: "competitors", message: "Analyzing competitors..." });
         const competitors = aggregateCompetitors(allResults, domain);
-        insertCompetitors(scan.id, competitors);
+        await insertCompetitors(scan.id, competitors);
         sendEvent(controller, "competitors", { competitors });
 
         // Step 5: Calculate scores
@@ -183,11 +176,11 @@ export async function POST(req: NextRequest) {
           allResults,
           competitors
         );
-        insertRecommendations(scan.id, recommendations);
+        await insertRecommendations(scan.id, recommendations);
         sendEvent(controller, "recommendations", { recommendations });
 
         // Step 7: Update scan with final scores
-        updateScan(scan.id, {
+        await updateScan(scan.id, {
           status: "done",
           overall_score: scores.overall_score,
           mention_rate: scores.mention_rate,
@@ -208,7 +201,7 @@ export async function POST(req: NextRequest) {
         });
       } catch (error) {
         console.error("Analysis error:", error);
-        updateScan(scan.id, { status: "error" });
+        await updateScan(scan.id, { status: "error" });
         sendEvent(controller, "error", {
           message: error instanceof Error ? error.message : "Analysis failed",
           scanId: scan.id,

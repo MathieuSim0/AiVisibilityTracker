@@ -9,12 +9,12 @@ export async function POST(req: NextRequest) {
   }
 
   const { code } = await req.json();
-  const valid = verify2FAToken(session.user.id, code);
+  const valid = await verify2FAToken(session.user.id, code);
   if (!valid) {
     return NextResponse.json({ error: "Invalid code" }, { status: 400 });
   }
 
-  disable2FA(session.user.id);
+  await disable2FA(session.user.id);
   await update({ user: { twoFaEnabled: false, twoFaVerified: true } });
 
   return NextResponse.json({ success: true });
